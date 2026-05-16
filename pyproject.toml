@@ -1,0 +1,37 @@
+[project]
+name = "tlog-scales"
+dynamic = ["version"]
+description = "Python tooling for tlog-tiles logs"
+readme = "README.md"
+
+authors = [
+    { name = "Florian Larysch", email = "fl@n621.de" }
+]
+license = "Apache-2.0"
+
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.34.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.1",
+    "pytest-cov>=6.0.0",
+]
+
+[project.scripts]
+tlog-tiles = "tlog_scales.cli:main"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/tlog_scales/__about__.py"
+
+[tool.ruff.lint]
+ignore = ["E741"]
