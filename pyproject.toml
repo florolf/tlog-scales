@@ -14,14 +14,18 @@ dependencies = [
     "requests>=2.34.2",
 ]
 
+[project.urls]
+"Homepage" = "https://github.com/florolf/tlog-scales"
+"Bug Tracker" = "https://github.com/florolf/tlog-scales/issues"
+
+[project.scripts]
+tlog-tiles = "tlog_scales.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.1",
     "pytest-cov>=6.0.0",
 ]
-
-[project.scripts]
-tlog-tiles = "tlog_scales.cli:main"
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
