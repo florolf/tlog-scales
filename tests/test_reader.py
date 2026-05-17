@@ -4,7 +4,7 @@ from typing import Callable
 from tlog_scales.backend import LocalBackend
 from tlog_scales.reader import TilesReader
 from tlog_scales.signing import DummySigner
-from tlog_scales.tlog import ConsistencyProof
+from tlog_scales.tlog import ConsistencyProof, InclusionProof
 from tlog_scales.utils import sha256
 from tlog_scales.writer import TilesWriter
 
@@ -111,6 +111,37 @@ def check_consistency_proof(cp: ConsistencyProof, old_hash: bytes, new_hash: byt
     return fr == first_hash and sr == second_hash and sn == 0
 
 
+def check_inclusion_proof(ip: InclusionProof, leaf_hash: bytes, root_hash: bytes, tree_size: int) -> None:
+    # RFC 9162, section 2.1.3.2
+
+    assert ip.leaf_index < tree_size
+
+    fn = ip.leaf_index
+    sn = tree_size - 1
+
+    r = leaf_hash
+    for p in ip.node_hashes:
+        assert sn != 0
+        if fn & 1 or fn == sn:
+            r = sha256(b'\x01' + p + r)
+
+            if fn & 1 == 0:
+                while True:
+                    fn >>= 1
+                    sn >>= 1
+
+                    if fn & 1 != 0 or fn == 0:
+                        break
+        else:
+            r = sha256(b'\x01' + r + p)
+
+        fn >>= 1
+        sn >>= 1
+
+    assert sn == 0
+    assert r == root_hash
+
+
 def test_root_hash_matches_checkpoint(populated_log: Callable[[int], Path]) -> None:
     root = populated_log(500)
 
@@ -147,6 +178,31 @@ def test_pairwise_consistency_proofs(tmp_path: Path) -> None:
                 f"consistency proof failed for {old} -> {new}"
 
 
+def test_inclusion_proofs(tmp_path: Path) -> None:
+    sizes = [1, 2, 5, 255, 256, 257, 500, 513]
+
+    writer = TilesWriter(tmp_path, "example.com/test", 0)
+    ctr = 0
+    root_hashes: dict[int, bytes] = {}
+    for size in sizes:
+        while ctr < size:
+            writer.add_leaf(ctr.to_bytes(8))
+            ctr += 1
+        writer.commit([DummySigner()])
+        root_hashes[size] = writer.reader.calculate_root_hash()
+
+    reader = TilesReader(LocalBackend(tmp_path))
+    reader.set_size(sizes[-1])
+
+    for size in sizes:
+        for i in sizes:
+            if i >= size:
+                continue
+            leaf_hash = sha256(b'\x00' + i.to_bytes(8))
+            proof = reader.get_inclusion_proof(i, size)
+            check_inclusion_proof(proof, leaf_hash, root_hashes[size], size)
+
+
 def test_full_tile_fallback(tmp_path: Path) -> None:
     writer = TilesWriter(tmp_path, "example.com/test", 0)
     for i in range(5):
@@ -174,8 +230,6 @@ def test_full_tile_fallback(tmp_path: Path) -> None:
     # The reader still believes size == 5; reading must fall back from the
     # (now-missing) partial to the full tile
     proof = reader.get_inclusion_proof(4, old_cp.size)
-    assert proof.leaf_index == 4
-    assert proof.tree_size == 5
-    assert proof.node_hashes  # non-empty
 
-    # TODO: verify inclusion proof too
+    leaf_hash = sha256(b'\x00' + (4).to_bytes(8))
+    check_inclusion_proof(proof, leaf_hash, old_cp.root_hash, old_cp.size)
