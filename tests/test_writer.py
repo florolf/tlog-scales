@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Callable
 
 from tlog_scales.signing import DummySigner
 from tlog_scales.tlog import Checkpoint
@@ -71,3 +72,48 @@ def test_many_entries(tmp_path: Path) -> None:
     assert _hash_file_hex(tmp_path / "tile" / "0" / "001.p" / "244")       == "02ed988bacba01ac7917ea0bb9c29dbaa1d7bcf23fef761e24daf4893aeb8f1c"
     assert _hash_file_hex(tmp_path / "tile" / "1" / "000.p" / "1")         == "6798b752c531ad04237b025eaf98e4e00ee73d3af503cc71b8b220de3573b550"
     assert _hash_file_hex(tmp_path / "checkpoint")                         == "e81bf73e4b2e63a6ef4b91a4d145761d5baff9146f199dfef521a85321d80ee3"
+
+def test_batching_equivalence(tmp_path: Path) -> None:
+    n = 600
+
+    shapes = {
+        "oneshot": [n],
+        "per-leaf": [1] * n,
+        "mixed": [1, 254, 1, 1, 257, 86],
+    }
+    assert all(sum(s) == n for s in shapes.values())
+
+    roots: dict[str, bytes] = {}
+    for name, batches in shapes.items():
+        root = tmp_path / name
+        root.mkdir()
+        writer = TilesWriter(root, ORIGIN, 0)
+
+        ctr = 0
+        for batch in batches:
+            for _ in range(batch):
+                writer.add_leaf(ctr.to_bytes(8))
+                ctr += 1
+            writer.commit([DummySigner()])
+
+        roots[name] = _read_checkpoint(root).root_hash
+
+    assert len(set(roots.values())) == 1, roots
+
+
+def test_open_from_path(tmp_path: Path, populated_log: Callable[[int], Path]) -> None:
+    writer = TilesWriter(tmp_path, ORIGIN, 0)
+    for i in range(100):
+        writer.add_leaf(i.to_bytes(8))
+    writer.commit([DummySigner()])
+
+    # reopen
+    writer = TilesWriter.from_path(tmp_path)
+    assert writer.origin == ORIGIN
+    assert writer.size == 100
+    for i in range(100, 300):
+        writer.add_leaf(i.to_bytes(8))
+    writer.commit([DummySigner()])
+
+    assert _read_checkpoint(tmp_path).root_hash == _read_checkpoint(populated_log(300)).root_hash
+
