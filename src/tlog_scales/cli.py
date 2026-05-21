@@ -1,5 +1,6 @@
 import argparse
 import logging
+import sys
 
 from .reader import TilesReader
 from .utils import b64enc
@@ -31,6 +32,15 @@ def cmd_gen_proof(args) -> None:
     print(cp.serialize(), end='')
 
 
+def cmd_get_leaf(args) -> None:
+    reader = TilesReader(backend.make_backend(args.location))
+    cp = reader.get_checkpoint()
+
+    index = resolve_index(cp, args.leaf_index)
+    leaf = reader.get_entry(index)
+    sys.stdout.buffer.write(leaf)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="tlog-tiles")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
@@ -41,6 +51,11 @@ def build_parser() -> argparse.ArgumentParser:
     subcmd.add_argument("location", help="Location of the log (URL or path)")
     subcmd.add_argument("leaf_index", type=int, help="Leaf index (negative for tree-size relative indexing, -1 -> last leaf)")
     subcmd.set_defaults(func=cmd_gen_proof)
+
+    subcmd = subparsers.add_parser("get-leaf", help="Print a leaf")
+    subcmd.add_argument("location", help="Location of the log (URL or path)")
+    subcmd.add_argument("leaf_index", type=int, help="Leaf index (negative for tree-size relative indexing, -1 -> last leaf)")
+    subcmd.set_defaults(func=cmd_get_leaf)
 
     return parser
 
