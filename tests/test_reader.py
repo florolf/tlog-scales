@@ -203,6 +203,19 @@ def test_inclusion_proofs(tmp_path: Path) -> None:
             check_inclusion_proof(proof, leaf_hash, root_hashes[size], size)
 
 
+def test_get_entry(tmp_path: Path) -> None:
+    writer = TilesWriter(tmp_path, "example.com/test", 0)
+    for i in range(513):
+        writer.add_leaf(i.to_bytes(8))
+    writer.commit([DummySigner()])
+
+    reader = TilesReader(LocalBackend(tmp_path))
+    reader.get_checkpoint()
+
+    for i in range(513):
+        assert reader.get_entry(i) == i.to_bytes(8), f"entry {i} mismatch"
+
+
 def test_full_tile_fallback(tmp_path: Path) -> None:
     writer = TilesWriter(tmp_path, "example.com/test", 0)
     for i in range(5):

@@ -8,25 +8,40 @@ from .utils import sha256
 
 
 class Tile:
-    def __init__(self, hashes: list[bytes]):
-        if len(hashes) > 256:
-            raise ValueError(f'tile too large: {len(hashes)}')
+    def __init__(self, entries: list[bytes]):
+        if len(entries) > 256:
+            raise ValueError(f'tile too large: {len(entries)}')
 
-        self.hashes = hashes
+        self.entries = entries
 
     @property
     def length(self):
-        return len(self.hashes)
+        return len(self.entries)
 
     def __getitem__(self, index):
-        return self.hashes[index]
+        return self.entries[index]
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> Self:
+    def from_hash_bytes(cls, data: bytes) -> Self:
         if len(data) % 32:
-            raise ValueError('tile data needs to be a multiple of 32 bytes')
+            raise ValueError('hash tile data needs to be a multiple of 32 bytes')
 
         return cls([data[i:i+32] for i in range(0, len(data), 32)])
+
+    @classmethod
+    def from_entries_bytes(cls, data: bytes) -> Self:
+        entries = []
+        while data:
+            entry_length = int.from_bytes(data[:2])
+
+            if len(data) < 2 + entry_length:
+                raise ValueError("entry tile is truncated")
+
+            entries.append(data[2:2+entry_length])
+
+            data = data[2+entry_length:]
+
+        return cls(entries)
 
 
 class TileCache:
@@ -63,7 +78,10 @@ class TilesReader:
         if data is None:
             return None
 
-        return Tile.from_bytes(data)
+        if l == -1:
+            return Tile.from_entries_bytes(data)
+        else:
+            return Tile.from_hash_bytes(data)
 
     def _get_from_tile(self, l: int, n: int, i: int) -> bytes:
         assert self.size is not None
@@ -174,3 +192,6 @@ class TilesReader:
             idx, size, path(idx, 0, size)
         )
 
+    def get_entry(self, idx: int) -> bytes:
+        tile, offset = divmod(idx, 256)
+        return self._get_from_tile(-1, tile, offset)
