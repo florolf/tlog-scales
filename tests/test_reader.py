@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Callable
 
+import pytest
+
 from tlog_scales.backend import LocalBackend
 from tlog_scales.reader import TilesReader
 from tlog_scales.signing import DummySigner
@@ -143,6 +145,17 @@ def check_inclusion_proof(ip: InclusionProof, leaf_hash: bytes, root_hash: bytes
 
 
 class TestTilesReader:
+    def test_missing_checkpoint(self, tmp_path: Path) -> None:
+        reader = TilesReader(LocalBackend(tmp_path))
+        with pytest.raises(RuntimeError, match="no checkpoint found"):
+            reader.get_checkpoint()
+
+    def test_missing_tile(self, tmp_path: Path) -> None:
+        reader = TilesReader(LocalBackend(tmp_path))
+        reader.set_size(1)
+        with pytest.raises(RuntimeError, match="could not get tile"):
+            reader._get_from_tile(0, 0, 0)
+
     def test_root_hash_matches_checkpoint(self, populated_log: Callable[[int], Path]) -> None:
         root = populated_log(500)
 
