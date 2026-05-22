@@ -1,3 +1,5 @@
+from .utils import sha256
+
 def next_split(x: int) -> int:
     """Largest power of two smaller than x"""
     assert x > 1
@@ -28,3 +30,7 @@ def level_tiles(tree_size: int, level: int) -> tuple[int, int]:
     entries = level_entries(tree_size, level)
     completed_tiles, partial_size = divmod(entries, 256)
     return completed_tiles, partial_size
+
+
+def leaf_hash(leaf: bytes) -> bytes:
+    return sha256(b'\x00' + leaf)

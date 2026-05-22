@@ -4,7 +4,7 @@ import sys
 
 from .reader import TilesReader
 from .utils import b64enc
-from . import backend, tlog
+from . import backend, tlog, tiles
 
 
 def resolve_index(cp: tlog.Checkpoint, index: int) -> int:
@@ -38,6 +38,11 @@ def cmd_get_leaf(args) -> None:
 
     index = resolve_index(cp, args.leaf_index)
     leaf = reader.get_entry(index)
+
+    if args.check:
+        ip = reader.get_inclusion_proof(index, cp.size)
+        ip.check(tiles.leaf_hash(leaf), cp.root_hash)
+
     sys.stdout.buffer.write(leaf)
 
 
@@ -53,6 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcmd.set_defaults(func=cmd_gen_proof)
 
     subcmd = subparsers.add_parser("get-leaf", help="Print a leaf")
+    subcmd.add_argument("-c", "--check", action="store_true", help="Check inclusion in checkpoint")
     subcmd.add_argument("location", help="Location of the log (URL or path)")
     subcmd.add_argument("leaf_index", type=int, help="Leaf index (negative for tree-size relative indexing, -1 -> last leaf)")
     subcmd.set_defaults(func=cmd_get_leaf)
