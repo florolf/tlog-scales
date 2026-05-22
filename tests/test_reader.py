@@ -142,107 +142,104 @@ def check_inclusion_proof(ip: InclusionProof, leaf_hash: bytes, root_hash: bytes
     assert r == root_hash
 
 
-def test_root_hash_matches_checkpoint(populated_log: Callable[[int], Path]) -> None:
-    root = populated_log(500)
+class TestTilesReader:
+    def test_root_hash_matches_checkpoint(self, populated_log: Callable[[int], Path]) -> None:
+        root = populated_log(500)
 
-    reader = TilesReader(LocalBackend(root))
-    cp = reader.get_checkpoint()
+        reader = TilesReader(LocalBackend(root))
+        cp = reader.get_checkpoint()
 
-    assert cp.size == 500
-    assert reader.calculate_root_hash() == cp.root_hash
+        assert cp.size == 500
+        assert reader.calculate_root_hash() == cp.root_hash
 
+    def test_pairwise_consistency_proofs(self, tmp_path: Path) -> None:
+        sizes = [1, 2, 5, 255, 256, 257, 500, 513]
 
-def test_pairwise_consistency_proofs(tmp_path: Path) -> None:
-    sizes = [1, 2, 5, 255, 256, 257, 500, 513]
+        writer = TilesWriter(tmp_path, "example.com/test", 0)
+        ctr = 0
+        root_hashes: dict[int, bytes] = {}
+        for size in sizes:
+            while ctr < size:
+                writer.add_leaf(ctr.to_bytes(8))
+                ctr += 1
+            writer.commit([DummySigner()])
+            root_hashes[size] = writer.reader.calculate_root_hash()
 
-    writer = TilesWriter(tmp_path, "example.com/test", 0)
-    ctr = 0
-    root_hashes: dict[int, bytes] = {}
-    for size in sizes:
-        while ctr < size:
-            writer.add_leaf(ctr.to_bytes(8))
-            ctr += 1
+        reader = TilesReader(LocalBackend(tmp_path))
+        reader.get_checkpoint()
+
+        for old in sizes:
+            for new in sizes:
+                if old >= new:
+                    continue
+
+                proof = reader.get_consistency_proof(old, new)
+                assert check_consistency_proof(proof, root_hashes[old], root_hashes[new]), \
+                    f"consistency proof failed for {old} -> {new}"
+
+    def test_inclusion_proofs(self, tmp_path: Path) -> None:
+        sizes = [1, 2, 5, 255, 256, 257, 500, 513]
+
+        writer = TilesWriter(tmp_path, "example.com/test", 0)
+        ctr = 0
+        root_hashes: dict[int, bytes] = {}
+        for size in sizes:
+            while ctr < size:
+                writer.add_leaf(ctr.to_bytes(8))
+                ctr += 1
+            writer.commit([DummySigner()])
+            root_hashes[size] = writer.reader.calculate_root_hash()
+
+        reader = TilesReader(LocalBackend(tmp_path))
+        reader.set_size(sizes[-1])
+
+        for size in sizes:
+            for i in sizes:
+                if i >= size:
+                    continue
+                leaf_hash = sha256(b'\x00' + i.to_bytes(8))
+                proof = reader.get_inclusion_proof(i, size)
+                check_inclusion_proof(proof, leaf_hash, root_hashes[size], size)
+
+    def test_get_entry(self, tmp_path: Path) -> None:
+        writer = TilesWriter(tmp_path, "example.com/test", 0)
+        for i in range(513):
+            writer.add_leaf(i.to_bytes(8))
         writer.commit([DummySigner()])
-        root_hashes[size] = writer.reader.calculate_root_hash()
 
-    reader = TilesReader(LocalBackend(tmp_path))
-    reader.get_checkpoint()
+        reader = TilesReader(LocalBackend(tmp_path))
+        reader.get_checkpoint()
 
-    for old in sizes:
-        for new in sizes:
-            if old >= new:
-                continue
+        for i in range(513):
+            assert reader.get_entry(i) == i.to_bytes(8), f"entry {i} mismatch"
 
-            proof = reader.get_consistency_proof(old, new)
-            assert check_consistency_proof(proof, root_hashes[old], root_hashes[new]), \
-                f"consistency proof failed for {old} -> {new}"
-
-
-def test_inclusion_proofs(tmp_path: Path) -> None:
-    sizes = [1, 2, 5, 255, 256, 257, 500, 513]
-
-    writer = TilesWriter(tmp_path, "example.com/test", 0)
-    ctr = 0
-    root_hashes: dict[int, bytes] = {}
-    for size in sizes:
-        while ctr < size:
-            writer.add_leaf(ctr.to_bytes(8))
-            ctr += 1
+    def test_full_tile_fallback(self, tmp_path: Path) -> None:
+        writer = TilesWriter(tmp_path, "example.com/test", 0)
+        for i in range(5):
+            writer.add_leaf(i.to_bytes(8))
         writer.commit([DummySigner()])
-        root_hashes[size] = writer.reader.calculate_root_hash()
 
-    reader = TilesReader(LocalBackend(tmp_path))
-    reader.set_size(sizes[-1])
+        # The reader fetches a checkpoint
+        reader = TilesReader(LocalBackend(tmp_path))
+        old_cp = reader.get_checkpoint()
+        assert old_cp.size == 5
 
-    for size in sizes:
-        for i in sizes:
-            if i >= size:
-                continue
-            leaf_hash = sha256(b'\x00' + i.to_bytes(8))
-            proof = reader.get_inclusion_proof(i, size)
-            check_inclusion_proof(proof, leaf_hash, root_hashes[size], size)
+        # At size 5, level-0 tile 0 is a partial of length 5.
+        partial_path = tmp_path / "tile" / "0" / "000.p"
+        assert (partial_path / "5").exists()
 
+        # In the meantime, the log now adds more entries
+        for i in range(5, 260):
+            writer.add_leaf(i.to_bytes(8))
+        writer.commit([DummySigner()])
 
-def test_get_entry(tmp_path: Path) -> None:
-    writer = TilesWriter(tmp_path, "example.com/test", 0)
-    for i in range(513):
-        writer.add_leaf(i.to_bytes(8))
-    writer.commit([DummySigner()])
+        # This causes the partial tile to get deleted and a full tile to be created
+        assert not partial_path.exists()
+        assert (tmp_path / "tile" / "0" / "000").exists()
 
-    reader = TilesReader(LocalBackend(tmp_path))
-    reader.get_checkpoint()
+        # The reader still believes size == 5; reading must fall back from the
+        # (now-missing) partial to the full tile
+        proof = reader.get_inclusion_proof(4, old_cp.size)
 
-    for i in range(513):
-        assert reader.get_entry(i) == i.to_bytes(8), f"entry {i} mismatch"
-
-
-def test_full_tile_fallback(tmp_path: Path) -> None:
-    writer = TilesWriter(tmp_path, "example.com/test", 0)
-    for i in range(5):
-        writer.add_leaf(i.to_bytes(8))
-    writer.commit([DummySigner()])
-
-    # The reader fetches a checkpoint
-    reader = TilesReader(LocalBackend(tmp_path))
-    old_cp = reader.get_checkpoint()
-    assert old_cp.size == 5
-
-    # At size 5, level-0 tile 0 is a partial of length 5.
-    partial_path = tmp_path / "tile" / "0" / "000.p"
-    assert (partial_path / "5").exists()
-
-    # In the meantime, the log now adds more entries
-    for i in range(5, 260):
-        writer.add_leaf(i.to_bytes(8))
-    writer.commit([DummySigner()])
-
-    # This causes the partial tile to get deleted and a full tile to be created
-    assert not partial_path.exists()
-    assert (tmp_path / "tile" / "0" / "000").exists()
-
-    # The reader still believes size == 5; reading must fall back from the
-    # (now-missing) partial to the full tile
-    proof = reader.get_inclusion_proof(4, old_cp.size)
-
-    leaf_hash = sha256(b'\x00' + (4).to_bytes(8))
-    check_inclusion_proof(proof, leaf_hash, old_cp.root_hash, old_cp.size)
+        leaf_hash = sha256(b'\x00' + (4).to_bytes(8))
+        check_inclusion_proof(proof, leaf_hash, old_cp.root_hash, old_cp.size)
