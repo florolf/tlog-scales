@@ -25,6 +25,7 @@ tlog-tiles = "tlog_scales.cli:main"
 dev = [
     "pytest>=9.0.1",
     "pytest-cov>=6.0.0",
+    "pytest-md-report>=0.8.0",
 ]
 
 [build-system]

@@ -35,14 +35,24 @@ jobs:
         run: uvx ty check --output-format=github
 
       - name: Run tests
-        run: uv run pytest tests --junitxml=junit/test-results.xml --cov=src --cov-report=term --cov-report=xml
+        env:
+          REPORT_OUTPUT: md_report.md
+        run: |
+          echo "REPORT_FILE=${REPORT_OUTPUT}" >> "$GITHUB_ENV"
+          uv run pytest tests --cov=src --cov-report=term --cov-report=xml \
+            --md-report --md-report-output "$REPORT_OUTPUT"
+
+      - name: Test report
+        if: success() || failure()
+        run: |
+          if [ -f "$REPORT_FILE" ]; then
+            echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            cat "$REPORT_FILE" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Coverage summary
-        if: success() || failure()
-        run: uv run coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
-
-      - name: Test summary
-        uses: mikepenz/action-junit-report@v6.4.0
-        if: success() || failure()
-        with:
-          report_paths: './junit/test-results.xml'
+        if: success()
+        run: |
+          echo "## Coverage" >> $GITHUB_STEP_SUMMARY
+          uv run coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
