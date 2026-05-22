@@ -3,8 +3,9 @@ from typing import Callable
 
 import pytest
 
+from tlog_scales import tiles
 from tlog_scales.backend import LocalBackend
-from tlog_scales.reader import TilesReader
+from tlog_scales.reader import Tile, TilesReader
 from tlog_scales.signing import DummySigner
 from tlog_scales.tlog import ConsistencyProof, InclusionProof
 from tlog_scales.utils import sha256
@@ -142,6 +143,32 @@ def check_inclusion_proof(ip: InclusionProof, leaf_hash: bytes, root_hash: bytes
 
     assert sn == 0
     assert r == root_hash
+
+
+class TestTilePath:
+    def test_tile_path(self) -> None:
+        assert tiles.tile_path(0, 0) == ["tile", "0", "000"]
+        assert tiles.tile_path(0, 1000) == ["tile", "0", "x001", "000"]
+        assert tiles.tile_path(0, 1234067) == ["tile", "0", "x001", "x234", "067"]
+
+        assert tiles.tile_path(1, 0) == ["tile", "1", "000"]
+        assert tiles.tile_path(-1, 0) == ["tile", "entries", "000"]
+
+
+class TestTile:
+    def test_too_large(self) -> None:
+        with pytest.raises(ValueError, match="tile too large"):
+            Tile([b'\x00' * 32] * 257)
+
+    def test_from_hash_bytes_bad_length(self) -> None:
+        with pytest.raises(ValueError, match="multiple of 32"):
+            Tile.from_hash_bytes(b'\x00' * 33)
+
+    def test_from_entries_bytes_truncated(self) -> None:
+        # header claims 10-byte entry but only 5 bytes follow
+        data = (10).to_bytes(2) + b'\x00' * 5
+        with pytest.raises(ValueError, match="truncated"):
+            Tile.from_entries_bytes(data)
 
 
 class TestTilesReader:
