@@ -27,15 +27,6 @@ def sha256(data: bytes) -> bytes:
     return h.digest()
 
 
-def vkey_id(name: str, sig_type: int, pubkey: bytes) -> int:
-    return int.from_bytes(sha256(
-        name.encode() +
-        b'\n' +
-        sig_type.to_bytes() +
-        pubkey
-    )[:4])
-
-
 def make_session() -> requests.Session:
     session = requests.Session()
     session.headers['User-Agent'] = f'tlog-scales/{TLOG_SCALES_VERSION}'
