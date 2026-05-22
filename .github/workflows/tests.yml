@@ -27,11 +27,9 @@ jobs:
         run: uv sync --locked --all-extras --dev
 
       - name: Lint
-        continue-on-error: true
-        run: uvx ruff check --output-format=github .
+        run: uvx ruff check --output-format=github
 
       - name: Type check
-        continue-on-error: true
         run: uvx ty check --output-format=github
 
       - name: Run tests
