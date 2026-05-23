@@ -24,8 +24,12 @@ class Checkpoint:
     def _serialize_body(origin: str, size: int, root_hash: bytes) -> str:
         return f"{origin}\n{size}\n{b64enc(root_hash)}\n"
 
-    def serialize(self) -> str:
-        checkpoint = self._serialize_body(self.origin, self.size, self.root_hash) + "\n"
+    def serialize(self, with_signatures: bool = True) -> str:
+        checkpoint = self._serialize_body(self.origin, self.size, self.root_hash)
+        if not with_signatures:
+            return checkpoint
+
+        checkpoint += "\n"
         for sig in self.signatures:
             checkpoint += f'{sig.serialize()}\n'
 
@@ -51,6 +55,16 @@ class Checkpoint:
             signatures.append(signer.sign(body.encode()))
 
         return cls(origin, size, root_hash, signatures)
+
+    def verify(self, vkey: signing.Vkey):
+        data = self.serialize(with_signatures=False).encode()
+
+        for sig in self.signatures:
+            if vkey.match(sig):
+                vkey.get_verifier().verify(sig.payload, data)
+                return
+
+        raise RuntimeError('no signature matched vkey')
 
 
 class ConsistencyProofInvalid(Exception):
