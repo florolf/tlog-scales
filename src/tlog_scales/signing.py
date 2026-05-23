@@ -10,7 +10,7 @@ class NoteSignature:
     payload: bytes
 
     def __str__(self) -> str:
-        return f"NoteSignature(name={self.name}, key_id={self.key_id:x}, payload={self.payload.hex()})"
+        return f"NoteSignature(name={self.name}, key_id={self.key_id:08x}, payload={self.payload.hex()})"
 
     def serialize(self) -> str:
         return f'\u2014 {self.name} {b64enc(self.key_id.to_bytes(4) + self.payload)}'
