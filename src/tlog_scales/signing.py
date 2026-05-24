@@ -45,8 +45,11 @@ class NoteSigner(Protocol):
 
 
 class DummySigner:
+    def __init__(self, name: str = 'dummy', key_id: Optional[int] = None):
+        self.vkey = Vkey(name, key_id, 0, b'')
+
     def sign(self, data: bytes) -> NoteSignature:
-        return NoteSignature('dummy', 0, sha256(data))
+        return NoteSignature.from_vkey_signature(self.vkey, sha256(data))
 
 
 class PlainEd25519Signer:

@@ -63,7 +63,7 @@ def test_many_entries(tmp_path: Path) -> None:
     for i in range(0, 500):
         writer.add_leaf(i.to_bytes(8))
 
-    writer.commit([DummySigner()])
+    writer.commit([DummySigner(key_id=0)])
 
     # known good data as validated by tessera/tlog_fsck
     assert _hash_file_hex(tmp_path / "tile" / "entries" / "000")           == "f4bae1960a3cedc6303230167918d50a56329bea77c58fbc22445dc195b60774"
