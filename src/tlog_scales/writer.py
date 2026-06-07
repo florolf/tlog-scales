@@ -67,8 +67,8 @@ class TilesWriter:
             utils.atomic_write(this_path, old_data + b''.join(this))
 
         # write full tiles and potentially a new partial
-        while elements:
-            this, elements = elements[:256], elements[256:]
+        for start in range(0, len(elements), 256):
+            this = elements[start:start + 256]
 
             if len(this) == 256:
                 this_path = self._tile_path(level, current_tile, 0)
