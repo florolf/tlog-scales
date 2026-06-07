@@ -66,7 +66,7 @@ class TilesWriter:
                 this_path = self._tile_path(level, current_tile, new_size)
                 can_cleanup = False
 
-            utils.sync_write(this_path, old_data + b''.join(this))
+            utils.atomic_write(this_path, old_data + b''.join(this))
 
             if cleanup and can_cleanup:
                 shutil.rmtree(this_path.with_suffix('.p'))
@@ -82,7 +82,7 @@ class TilesWriter:
                 this_path = self._tile_path(level, current_tile, len(this))
 
             this_path.parent.mkdir(parents=True, exist_ok=True)
-            utils.sync_write(this_path, b''.join(this))
+            utils.atomic_write(this_path, b''.join(this))
 
     def _hash_full_tile(self, l: int, n: int) -> bytes:
         data = self._tile_path(l, n).read_bytes()
@@ -128,7 +128,7 @@ class TilesWriter:
         try:
             root_hash = self.reader.calculate_root_hash()
             cp = tlog.Checkpoint.make_signed(self.origin, new_size, root_hash, signers)
-            utils.sync_write(self.root / "checkpoint", cp.serialize().encode())
+            utils.atomic_write(self.root / "checkpoint", cp.serialize().encode())
         except Exception as e:
             self.reader.set_size(self.size)
             raise e
