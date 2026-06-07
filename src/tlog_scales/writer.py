@@ -84,11 +84,10 @@ class TilesWriter:
         hashes = [data[i:i+32] for i in range(0, len(data), 32)]
 
         while len(hashes) > 1:
-            left = hashes.pop(0)
-            right = hashes.pop(0)
-
-            h = utils.sha256(b'\x01' + left + right)
-            hashes.append(h)
+            hashes = [
+                utils.sha256(b'\x01' + hashes[i] + hashes[i+1])
+                for i in range(0, len(hashes), 2)
+            ]
 
         return hashes[0]
 
