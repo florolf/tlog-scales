@@ -23,6 +23,11 @@ class TilesWriter:
 
         return cls(root, cp.origin, cp.size)
 
+    @classmethod
+    def create(cls, root: Path, origin: str) -> Self:
+        root.mkdir(parents=True)
+        return cls(root, origin, 0)
+
     def add_leaf(self, data: bytes) -> None:
         self.pending.append(data)
 

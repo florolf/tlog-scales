@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Callable
 
+import pytest
+
 from tlog_scales.signing import DummySigner
 from tlog_scales.tlog import Checkpoint
 from tlog_scales.utils import sha256
@@ -116,4 +118,21 @@ def test_open_from_path(tmp_path: Path, populated_log: Callable[[int], Path]) ->
     writer.commit([DummySigner()])
 
     assert _read_checkpoint(tmp_path).root_hash == _read_checkpoint(populated_log(300)).root_hash
+
+
+def test_create(tmp_path: Path) -> None:
+    root = tmp_path / "log"
+    writer = TilesWriter.create(root, ORIGIN)
+    writer.commit([DummySigner()])
+
+    cp = _read_checkpoint(root)
+
+    assert root.is_dir()
+    assert cp.origin == ORIGIN
+    assert cp.size == 0
+
+
+def test_create_existing_dir_raises(tmp_path: Path) -> None:
+    with pytest.raises(FileExistsError):
+        TilesWriter.create(tmp_path, ORIGIN)
 
