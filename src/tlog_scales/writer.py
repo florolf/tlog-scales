@@ -34,7 +34,7 @@ class TilesWriter:
     def _tile_path(self, l: int, n: int, partial: int = 0) -> Path:
         return self.root.joinpath(*tiles.tile_path(l, n, partial))
 
-    def _append_tile(self, level: int, elements: list[bytes], cleanup: bool = True):
+    def _append_tile(self, level: int, elements: list[bytes]):
         if not elements:
             return
 
@@ -61,15 +61,10 @@ class TilesWriter:
             if new_size == 256:
                 this_path = self._tile_path(level, current_tile, 0)
                 current_tile += 1
-                can_cleanup = True
             else:
                 this_path = self._tile_path(level, current_tile, new_size)
-                can_cleanup = False
 
             utils.atomic_write(this_path, old_data + b''.join(this))
-
-            if cleanup and can_cleanup:
-                shutil.rmtree(this_path.with_suffix('.p'))
 
         # write full tiles and potentially a new partial
         while elements:
@@ -97,7 +92,30 @@ class TilesWriter:
 
         return hashes[0]
 
-    def commit(self, signers: list[signing.NoteSigner]) -> None:
+    def gc(self) -> None:
+        def _gc(p: Path) -> None:
+            for child in p.iterdir():
+                if not child.is_dir():
+                    continue
+
+                n = child.name
+                if n.startswith('x'):
+                    _gc(child)
+                elif n.endswith('.p'):
+                    full = n[:-2]
+                    if (p / full).exists():
+                        shutil.rmtree(child)
+
+        tiles_root = self.root / 'tile'
+
+        if not tiles_root.exists():
+            return
+
+        for child in tiles_root.iterdir():
+            if child.is_dir():
+                _gc(child)
+
+    def commit(self, signers: list[signing.NoteSigner], gc: bool = True) -> None:
         entries = []
         for leaf in self.pending:
             entries.append(len(leaf).to_bytes(length=2) + leaf)
@@ -135,3 +153,6 @@ class TilesWriter:
 
         self.size = new_size
         self.pending = []
+
+        if gc:
+            self.gc()

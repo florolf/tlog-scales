@@ -136,3 +136,66 @@ def test_create_existing_dir_raises(tmp_path: Path) -> None:
     with pytest.raises(FileExistsError):
         TilesWriter.create(tmp_path, ORIGIN)
 
+
+def test_commit_gc(tmp_path: Path) -> None:
+    writer = TilesWriter(tmp_path, ORIGIN, 0)
+
+    prev = 0
+    for boundary in [100, 300]:
+        for i in range(prev, boundary):
+            writer.add_leaf(i.to_bytes(8))
+        writer.commit([DummySigner()])
+        prev = boundary
+
+    assert (tmp_path / "tile" / "entries" / "000").exists()
+    assert not (tmp_path / "tile" / "entries" / "000.p").exists()
+
+    assert not (tmp_path / "tile" / "entries" / "001").exists()
+    assert (tmp_path / "tile" / "entries" / "001.p").exists()
+
+
+def test_manual_gc(tmp_path: Path) -> None:
+    writer = TilesWriter(tmp_path, ORIGIN, 0)
+
+    prev = 0
+    for boundary in [100, 300]:
+        for i in range(prev, boundary):
+            writer.add_leaf(i.to_bytes(8))
+        writer.commit([DummySigner()], gc=False)
+        prev = boundary
+
+    assert (tmp_path / "tile" / "entries" / "000").exists()
+    assert (tmp_path / "tile" / "entries" / "000.p").exists()
+
+    assert (tmp_path / "tile" / "entries" / "001.p").exists()
+
+    writer.gc()
+
+    assert (tmp_path / "tile" / "entries" / "000").exists()
+    assert not (tmp_path / "tile" / "entries" / "000.p").exists()
+
+    assert not (tmp_path / "tile" / "entries" / "001").exists()
+    assert (tmp_path / "tile" / "entries" / "001.p").exists()
+
+
+def test_gc_large_tree(tmp_path: Path) -> None:
+    writer = TilesWriter(tmp_path, ORIGIN, 0)
+
+    prev = 0
+    for boundary in [256 * 1000 + 100, 256 * 1000 + 300]:
+        for i in range(prev, boundary):
+            writer.add_leaf(i.to_bytes(8))
+        writer.commit([DummySigner()], gc=False)
+        prev = boundary
+
+    x_dir = tmp_path / "tile" / "entries" / "x001"
+
+    assert (x_dir / "000").exists()
+    assert (x_dir / "000.p").exists()
+    assert (x_dir / "001.p").exists()
+
+    writer.gc()
+
+    assert (x_dir / "000").exists()
+    assert not (x_dir / "000.p").exists()
+    assert (x_dir / "001.p").exists()
