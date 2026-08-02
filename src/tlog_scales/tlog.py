@@ -1,3 +1,5 @@
+import dataclasses
+
 from dataclasses import dataclass
 from typing import Self
 
@@ -12,23 +14,15 @@ class Checkpoint:
 
     signatures: list[signing.NoteSignature]
 
-    def __post_init__(self):
-        if not self.signatures:
-            raise ValueError('checkpoints need at least one signature')
-
     def __str__(self):
         signatures = [str(x) for x in self.signatures]
         return f"Checkpoint(origin={self.origin}, size={self.size}, root_hash={self.root_hash.hex()}, signatures=[{','.join(signatures)}])"
 
-    @staticmethod
-    def _serialize_body(origin: str, size: int, root_hash: bytes) -> str:
-        return f"{origin}\n{size}\n{b64enc(root_hash)}\n"
+    def serialize_body(self) -> str:
+        return f"{self.origin}\n{self.size}\n{b64enc(self.root_hash)}\n"
 
-    def serialize(self, with_signatures: bool = True) -> str:
-        checkpoint = self._serialize_body(self.origin, self.size, self.root_hash)
-        if not with_signatures:
-            return checkpoint
-
+    def serialize(self) -> str:
+        checkpoint = self.serialize_body()
         checkpoint += "\n"
         for sig in self.signatures:
             checkpoint += f'{sig.serialize()}\n'
@@ -43,25 +37,25 @@ class Checkpoint:
         tree_size = int(lines[1])
         root_hash = b64dec(lines[2])
         signatures = [signing.NoteSignature.from_line(x) for x in lines[4:]]
+        if not signatures:
+            raise ValueError('checkpoints need at least one signature')
 
         return cls(origin, tree_size, root_hash, signatures)
 
     @classmethod
-    def make_signed(cls, origin: str, size: int, root_hash: bytes, signers: list[signing.NoteSigner]) -> Self:
-        body = cls._serialize_body(origin, size, root_hash)
+    def make_signed(cls, origin: str, size: int, root_hash: bytes, signers: list[signing.CheckpointSigner]) -> Self:
+        cp = cls(origin, size, root_hash, [])
 
         signatures = []
         for signer in signers:
-            signatures.append(signer.sign(body.encode()))
+            signatures.append(signer.sign(cp))
 
-        return cls(origin, size, root_hash, signatures)
+        return dataclasses.replace(cp, signatures=signatures)
 
     def verify(self, vkey: signing.Vkey):
-        data = self.serialize(with_signatures=False).encode()
-
         for sig in self.signatures:
             if vkey.match(sig):
-                vkey.get_verifier().verify(sig.payload, data)
+                vkey.get_verifier().verify(sig.payload, self)
                 return
 
         raise RuntimeError('no signature matched vkey')

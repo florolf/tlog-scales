@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Protocol, Self, Iterable, Optional
+from typing import Protocol, Self, Iterable, Optional, TYPE_CHECKING
 from abc import ABC, abstractmethod
 import logging
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey, Ed25519PrivateKey
 
 from .utils import b64enc, b64dec, sha256
+
+if TYPE_CHECKING:
+    from .tlog import Checkpoint
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +42,10 @@ class NoteSignature:
         return cls(vkey.name, vkey.key_id, signature)
 
 
-class NoteSigner(Protocol):
+class CheckpointSigner(Protocol):
     vkey: 'Vkey'
 
-    def sign(self, data: bytes) -> NoteSignature:
+    def sign(self, cp: Checkpoint) -> NoteSignature:
         ...
 
 
@@ -48,8 +53,8 @@ class DummySigner:
     def __init__(self, name: str = 'dummy', key_id: Optional[int] = None):
         self.vkey = Vkey(name, key_id, 0, b'')
 
-    def sign(self, data: bytes) -> NoteSignature:
-        return NoteSignature.from_vkey_signature(self.vkey, sha256(data))
+    def sign(self, cp: Checkpoint) -> NoteSignature:
+        return NoteSignature.from_vkey_signature(self.vkey, sha256(cp.serialize_body().encode()))
 
 
 class PlainEd25519Signer:
@@ -61,8 +66,8 @@ class PlainEd25519Signer:
 
         self.vkey = Vkey(name, None, 1, self.key.public_key().public_bytes_raw())
 
-    def sign(self, data: bytes) -> NoteSignature:
-        sig = self.key.sign(data)
+    def sign(self, cp: Checkpoint) -> NoteSignature:
+        sig = self.key.sign(cp.serialize_body().encode())
         return NoteSignature.from_vkey_signature(self.vkey, sig)
 
 
@@ -73,14 +78,14 @@ class VkeyVerifier(ABC):
         self.vkey = vkey
 
     @abstractmethod
-    def verify(self, signature: bytes, data: bytes) -> None:
+    def verify(self, signature: bytes, cp: Checkpoint) -> None:
         raise NotImplementedError
 
-    def verify_note(self, note: NoteSignature, data: bytes) -> None:
+    def verify_note(self, note: NoteSignature, cp: Checkpoint) -> None:
         if not self.vkey.match(note):
             raise RuntimeError(f"verifier {self} doesn't match note signature {note}")
 
-        self.verify(note.payload, data)
+        self.verify(note.payload, cp)
 
 
 class PlainEd25519Verifier(VkeyVerifier):
@@ -93,7 +98,8 @@ class PlainEd25519Verifier(VkeyVerifier):
     def __str__(self) -> str:
         return f'PlainEd25519Verifier({self.vkey})'
 
-    def verify(self, signature: bytes, data: bytes) -> None:
+    def verify(self, signature: bytes, cp: Checkpoint) -> None:
+        data = cp.serialize_body().encode()
         self.key.verify(signature, data)
 
 
@@ -110,10 +116,10 @@ class Ed25519CosignatureVerifier(VkeyVerifier):
     def get_timestamp(self, signature: bytes) -> int:
         return int.from_bytes(signature[0:8])
 
-    def verify(self, signature: bytes, data: bytes):
+    def verify(self, signature: bytes, cp: Checkpoint):
         timestamp = self.get_timestamp(signature)
         message = f'cosignature/v1\ntime {timestamp}\n'.encode()
-        message += data
+        message += cp.serialize_body().encode()
 
         self.key.verify(signature[8:], message)
 
@@ -171,7 +177,7 @@ class VkeySet:
     def add(self, vkey: Vkey) -> None:
         self.keys[(vkey.name, vkey.key_id)] = vkey
 
-    def verify(self, sigs: Iterable[NoteSignature], data: bytes) -> set[tuple[Vkey, NoteSignature]]:
+    def verify(self, sigs: Iterable[NoteSignature], cp: Checkpoint) -> set[tuple[Vkey, NoteSignature]]:
         valid = set()
 
         for sig in sigs:
@@ -181,9 +187,9 @@ class VkeySet:
 
             verifier = vkey.get_verifier()
             try:
-                verifier.verify_note(sig, data)
+                verifier.verify_note(sig, cp)
                 valid.add((vkey, sig))
             except Exception as e:
-                logger.warning(f'verifying {sig} on {data.hex()} and vkey {vkey} failed', exc_info=e)
+                logger.warning(f'verifying {sig} on {cp} and vkey {vkey} failed', exc_info=e)
 
         return valid

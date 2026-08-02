@@ -114,7 +114,7 @@ class TilesWriter:
             if child.is_dir():
                 _gc(child)
 
-    def commit(self, signers: list[signing.NoteSigner], gc: bool = True) -> None:
+    def commit(self, signers: list[signing.CheckpointSigner], gc: bool = True) -> None:
         entries = []
         for leaf in self.pending:
             entries.append(len(leaf).to_bytes(length=2) + leaf)

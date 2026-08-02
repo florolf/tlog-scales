@@ -1,5 +1,6 @@
 import pytest
 import dataclasses
+import typing
 
 import cryptography.hazmat.primitives.serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -7,6 +8,26 @@ from cryptography.exceptions import InvalidSignature
 
 from tlog_scales.signing import NoteSignature, PlainEd25519Signer, Vkey, VkeySet
 from tlog_scales.tlog import Checkpoint
+from tlog_scales.utils import sha256
+
+
+class FakeCheckpoint:
+    """
+    Fake checkpoint for shoehorning the c2sp.org/signed-note test vector into
+    our Checkpoint-only API. This works because the test vector uses plain
+    Ed25519 keys which means the verifier implementation only relies on
+    serialize_body() anyway.
+    """
+
+    def __init__(self, body: str):
+        self.body = body
+
+    def serialize_body(self) -> str:
+        return self.body
+
+
+def dummy_checkpoint(origin: str = 'example.com/log', size: int = 1) -> Checkpoint:
+    return Checkpoint(origin, size, sha256(f'{origin} {size}'.encode()), [])
 
 
 class TestC2SPSignedNote:
@@ -21,9 +42,9 @@ class TestC2SPSignedNote:
         sig = NoteSignature.from_line(
             '— example.com/foo Uw2QOkn8srV1yJGh2VYRlL1Tnagv1YEq6TfXppzi2ONncAlTgK7Ztg1ERYNZXsYjOBH3mFXmRKuwHjG1Yu72IneyaQM='
         )
-        msg = b'This is an example message.\n'
+        cp  = typing.cast(Checkpoint, FakeCheckpoint('This is an example message.\n'))
 
-        vkey.get_verifier().verify_note(sig, msg)
+        vkey.get_verifier().verify_note(sig, cp)
 
     def test_parsing(self) -> None:
         parsed = Vkey.from_string(self.VKEY)
@@ -132,32 +153,32 @@ class TestVkeySetVerification:
     def test_valid(self) -> None:
         a = PlainEd25519Signer('a', b'a'*32)
         b = PlainEd25519Signer('b', b'b'*32)
-        data = b'payload'
-        sig_a = a.sign(data)
-        sig_b = b.sign(data)
+        cp = dummy_checkpoint()
+        sig_a = a.sign(cp)
+        sig_b = b.sign(cp)
 
-        valid = VkeySet(a.vkey, b.vkey).verify([sig_a, sig_b], data)
+        valid = VkeySet(a.vkey, b.vkey).verify([sig_a, sig_b], cp)
         assert valid == {(a.vkey, sig_a), (b.vkey, sig_b)}
 
     def test_skips_unknown_keys(self) -> None:
         a = PlainEd25519Signer('a', b'a'*32)
         b = PlainEd25519Signer('b', b'b'*32)
-        data = b'payload'
-        sig_a = a.sign(data)
-        sig_b = b.sign(data)
+        cp = dummy_checkpoint()
+        sig_a = a.sign(cp)
+        sig_b = b.sign(cp)
 
-        valid = VkeySet(a.vkey).verify([sig_a, sig_b], data)
+        valid = VkeySet(a.vkey).verify([sig_a, sig_b], cp)
         assert valid == {(a.vkey, sig_a)}
 
     def test_rejects_bad_data(self) -> None:
         signer = PlainEd25519Signer('a', b'a'*32)
-        sig = signer.sign(b'payload')
+        sig = signer.sign(dummy_checkpoint(size=1))
 
-        assert VkeySet(signer.vkey).verify([sig], b'foo') == set()
+        assert VkeySet(signer.vkey).verify([sig], dummy_checkpoint(size=2)) == set()
 
     def test_rejects_bad_sig(self) -> None:
         # Identity matches the known vkey, but the signature bytes are bogus
         signer = PlainEd25519Signer('a', b'a'*32)
         bad_sig = NoteSignature(signer.vkey.name, signer.vkey.key_id, b'\x00' * 64)
 
-        assert VkeySet(signer.vkey).verify([bad_sig], b'hello') == set()
+        assert VkeySet(signer.vkey).verify([bad_sig], dummy_checkpoint()) == set()
