@@ -1,12 +1,11 @@
 import typing
 from pathlib import Path
-from typing import Optional
 
 from . import utils
 
 
 class TilesBackend(typing.Protocol):
-    def get(self, *path: str) -> Optional[bytes]:
+    def get(self, *path: str) -> bytes | None:
         ...
 
 
@@ -14,7 +13,7 @@ class LocalBackend:
     def __init__(self, base: Path):
         self.base = base
 
-    def get(self, *path: str) -> Optional[bytes]:
+    def get(self, *path: str) -> bytes | None:
         p = self.base.joinpath(*path)
         try:
             return p.read_bytes()
@@ -27,7 +26,7 @@ class HttpBackend:
         self.base = base.rstrip('/')
         self.session = utils.make_session()
 
-    def get(self, *path: str) -> Optional[bytes]:
+    def get(self, *path: str) -> bytes | None:
         url = self.base + '/' + '/'.join(path)
 
         result = self.session.get(url)

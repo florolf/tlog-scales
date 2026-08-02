@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable, Optional, Protocol, Self
+from typing import TYPE_CHECKING, Iterable, Protocol, Self
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
@@ -54,7 +54,7 @@ class CheckpointSigner(Protocol):
 
 
 class DummySigner:
-    def __init__(self, name: str = 'dummy', key_id: Optional[int] = None):
+    def __init__(self, name: str = 'dummy', key_id: int | None = None):
         self.vkey = Vkey(name, key_id, 0, b'')
 
     def sign(self, cp: Checkpoint) -> NoteSignature:
@@ -162,7 +162,7 @@ class MLDSA44CosignatureVerifier(VkeyVerifier):
 
 
 class Vkey:
-    def __init__(self, name: str, key_id: Optional[int], sig_type: int, pubkey: bytes):
+    def __init__(self, name: str, key_id: int | None, sig_type: int, pubkey: bytes):
         self.name = name
 
         if key_id is None:

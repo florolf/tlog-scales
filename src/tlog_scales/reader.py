@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import Optional, Self
+from typing import Self
 
 from . import tiles
 from .backend import TilesBackend
@@ -49,7 +49,7 @@ class TileCache:
         self.tiles: OrderedDict[tuple[int, int], Tile] = OrderedDict()
         self.max_size = max_size
 
-    def get(self, l: int, n: int) -> Optional[Tile]:
+    def get(self, l: int, n: int) -> Tile | None:
         key = (l, n)
         if key not in self.tiles:
             return None
@@ -72,7 +72,7 @@ class TilesReader:
         self.size = None
         self.tile_cache = TileCache()
 
-    def _get_tile(self, l: int, n: int, partial: int = 0) -> Optional[Tile]:
+    def _get_tile(self, l: int, n: int, partial: int = 0) -> Tile | None:
         path = tiles.tile_path(l, n, partial)
         data = self.backend.get(*path)
         if data is None:
@@ -123,7 +123,7 @@ class TilesReader:
         self.size = size
 
     @staticmethod
-    def mth_in_tile(start: int, end: int) -> Optional[tuple[int, int, int]]:
+    def mth_in_tile(start: int, end: int) -> tuple[int, int, int] | None:
         l = 0
         while start & 0xff == 0 and end & 0xff == 0:
             start >>= 8
