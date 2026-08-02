@@ -146,9 +146,9 @@ class TilesWriter:
             root_hash = self.reader.calculate_root_hash()
             cp = tlog.Checkpoint.make_signed(self.origin, new_size, root_hash, signers)
             utils.atomic_write(self.root / "checkpoint", cp.serialize().encode())
-        except Exception as e:
+        except Exception:
             self.reader.set_size(self.size)
-            raise e
+            raise
 
         self.size = new_size
         self.pending = []

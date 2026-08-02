@@ -27,7 +27,7 @@ def cmd_gen_proof(args) -> None:
     for h in proof.node_hashes:
         print(b64enc(h))
 
-    print('')
+    print()
 
     print(cp.serialize(), end='')
 

@@ -61,7 +61,7 @@ def test_single_entry(tmp_path: Path) -> None:
 def test_many_entries(tmp_path: Path) -> None:
     writer = TilesWriter(tmp_path, ORIGIN, 0)
 
-    for i in range(0, 500):
+    for i in range(500):
         writer.add_leaf(i.to_bytes(8))
 
     writer.commit([DummySigner(key_id=0)])
