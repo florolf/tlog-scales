@@ -8,7 +8,6 @@ from tlog_scales.tlog import Checkpoint
 from tlog_scales.utils import sha256
 from tlog_scales.writer import TilesWriter
 
-
 ORIGIN = "example.com/test"
 
 

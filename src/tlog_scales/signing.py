@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Protocol, Self, Iterable, Optional, TYPE_CHECKING
-from abc import ABC, abstractmethod
 import logging
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Iterable, Optional, Protocol, Self
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey, Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+    Ed25519PublicKey,
+)
 from cryptography.hazmat.primitives.asymmetric.mldsa import MLDSA44PublicKey
 
-from .utils import b64enc, b64dec, sha256
+from .utils import b64dec, b64enc, sha256
 
 if TYPE_CHECKING:
     from .tlog import Checkpoint

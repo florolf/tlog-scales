@@ -1,9 +1,9 @@
 import shutil
-
 from pathlib import Path
 from typing import Self
 
-from . import tiles, utils, tlog, reader, backend, signing
+from . import backend, reader, signing, tiles, tlog, utils
+
 
 class TilesWriter:
     def __init__(self, root: Path, origin: str, size: int):

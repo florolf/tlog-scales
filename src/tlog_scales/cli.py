@@ -2,9 +2,9 @@ import argparse
 import logging
 import sys
 
+from . import backend, tiles, tlog
 from .reader import TilesReader
 from .utils import b64enc
-from . import backend, tlog, tiles
 
 
 def resolve_index(cp: tlog.Checkpoint, index: int) -> int:

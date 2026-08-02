@@ -1,10 +1,10 @@
-import pytest
 import dataclasses
 import typing
 
 import cryptography.hazmat.primitives.serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+import pytest
 from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from tlog_scales.signing import NoteSignature, PlainEd25519Signer, Vkey, VkeySet
 from tlog_scales.tlog import Checkpoint

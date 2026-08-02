@@ -1,14 +1,15 @@
-import hashlib
 import base64
+import hashlib
 import os
 import tempfile
-
 from pathlib import Path
 
 import requests
 
 try:
-    from .__about__ import __version__ as TLOG_SCALES_VERSION # ty: ignore[unresolved-import,unused-ignore-comment]
+    from .__about__ import (
+        __version__ as TLOG_SCALES_VERSION,  # ty: ignore[unresolved-import,unused-ignore-comment]
+    )
 except ImportError:
     TLOG_SCALES_VERSION = "unknown"
 

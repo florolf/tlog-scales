@@ -1,9 +1,9 @@
 from collections import OrderedDict
-from typing import Self, Optional
+from typing import Optional, Self
 
 from . import tiles
-from .tlog import Checkpoint, ConsistencyProof, InclusionProof
 from .backend import TilesBackend
+from .tlog import Checkpoint, ConsistencyProof, InclusionProof
 from .utils import sha256
 
 

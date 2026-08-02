@@ -1,5 +1,6 @@
 from .utils import sha256
 
+
 def next_split(x: int) -> int:
     """Largest power of two smaller than x"""
     assert x > 1

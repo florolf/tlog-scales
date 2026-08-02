@@ -1,10 +1,10 @@
 import dataclasses
-
 from dataclasses import dataclass
 from typing import Self
 
 from . import signing
-from .utils import b64enc, b64dec, sha256
+from .utils import b64dec, b64enc, sha256
+
 
 @dataclass(frozen=True)
 class Checkpoint:
