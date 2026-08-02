@@ -8,14 +8,14 @@ def next_split(x: int) -> int:
 
 
 def tile_path(l: int, n: int, partial: int = 0) -> list[str]:
-        elements = ['%03d' % (n % 1000)]
+        elements = [f'{n % 1000:03d}']
         while n >= 1000:
             n //= 1000
-            elements.insert(0, 'x%03d' % (n % 1000))
+            elements.insert(0, f'x{n % 1000:03d}')
 
         if partial:
             elements[-1] += '.p'
-            elements.append('%d' % partial)
+            elements.append(str(partial))
 
         return ['tile', str(l) if l >= 0 else 'entries', *elements]
 
