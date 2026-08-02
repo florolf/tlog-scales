@@ -37,13 +37,13 @@ class HttpBackend:
 
 
 def make_backend(loc: str) -> TilesBackend:
-    if loc.startswith('/') or loc.startswith('./'):
+    if loc.startswith(('/', './')):
         return LocalBackend(Path(loc))
 
     if loc.startswith('file://'):
         return LocalBackend(Path(loc[7:]))
 
-    if loc.startswith('http://') or loc.startswith('https://'):
+    if loc.startswith(('http://', 'https://')):
         return HttpBackend(loc)
 
     raise ValueError(f'unsupported backend location {loc}')
