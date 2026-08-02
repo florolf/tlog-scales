@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 import logging
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey, Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.mldsa import MLDSA44PublicKey
 
 from .utils import b64enc, b64dec, sha256
 
@@ -124,6 +125,39 @@ class Ed25519CosignatureVerifier(VkeyVerifier):
         self.key.verify(signature[8:], message)
 
 
+class MLDSA44CosignatureVerifier(VkeyVerifier):
+    def __init__(self, vkey: 'Vkey'):
+        assert vkey.sig_type == 6
+
+        super().__init__(vkey)
+        self.cosigner_name  = vkey.name
+        self.key = MLDSA44PublicKey.from_public_bytes(vkey.pubkey)
+
+    def __str__(self) -> str:
+        return f'MLDSA44CosignatureVerifier({self.vkey})'
+
+    def get_timestamp(self, signature: bytes) -> int:
+        return int.from_bytes(signature[0:8])
+
+    def verify(self, signature: bytes, cp: Checkpoint):
+        data = bytearray()
+
+        def append_u8_vector(payload: bytes) -> None:
+            nonlocal data
+            data += len(payload).to_bytes(1)
+            data += payload
+
+        data += b'subtree/v1\n\0'
+        append_u8_vector(self.cosigner_name.encode())
+        data += self.get_timestamp(signature).to_bytes(8)
+        append_u8_vector(cp.origin.encode())
+        data += (0).to_bytes(8) # start must be 0 for checkpoints
+        data += cp.size.to_bytes(8)
+        data += cp.root_hash
+
+        self.key.verify(signature[8:], data)
+
+
 class Vkey:
     def __init__(self, name: str, key_id: Optional[int], sig_type: int, pubkey: bytes):
         self.name = name
@@ -163,6 +197,8 @@ class Vkey:
                 return PlainEd25519Verifier(self)
             case 4:
                 return Ed25519CosignatureVerifier(self)
+            case 6:
+                return MLDSA44CosignatureVerifier(self)
             case _:
                 raise NotImplementedError(f'unsupported signature type {self.sig_type} for verification')
 
