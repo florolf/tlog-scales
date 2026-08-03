@@ -118,7 +118,8 @@ class Ed25519CosignatureVerifier(VkeyVerifier):
     def __str__(self) -> str:
         return f'Ed25519CosignatureVerifier({self.vkey})'
 
-    def get_timestamp(self, signature: bytes) -> int:
+    @staticmethod
+    def get_timestamp(signature: bytes) -> int:
         return int.from_bytes(signature[0:8])
 
     def verify(self, signature: bytes, cp: Checkpoint):
@@ -140,7 +141,8 @@ class MLDSA44CosignatureVerifier(VkeyVerifier):
     def __str__(self) -> str:
         return f'MLDSA44CosignatureVerifier({self.vkey})'
 
-    def get_timestamp(self, signature: bytes) -> int:
+    @staticmethod
+    def get_timestamp(signature: bytes) -> int:
         return int.from_bytes(signature[0:8])
 
     def verify(self, signature: bytes, cp: Checkpoint):
