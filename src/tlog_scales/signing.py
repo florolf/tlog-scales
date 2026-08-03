@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -10,7 +11,10 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
     Ed25519PublicKey,
 )
-from cryptography.hazmat.primitives.asymmetric.mldsa import MLDSA44PublicKey
+from cryptography.hazmat.primitives.asymmetric.mldsa import (
+    MLDSA44PrivateKey,
+    MLDSA44PublicKey,
+)
 
 from .utils import b64dec, b64enc, sha256
 
@@ -47,6 +51,25 @@ class NoteSignature:
         return cls(vkey.name, vkey.key_id, signature)
 
 
+def _mldsa44_signature_payload(signer: str, timestamp: int, cp: Checkpoint) -> bytes:
+    data = bytearray()
+
+    def append_u8_vector(payload: bytes) -> None:
+        nonlocal data
+        data += len(payload).to_bytes(1)
+        data += payload
+
+    data += b'subtree/v1\n\0'
+    append_u8_vector(signer.encode())
+    data += timestamp.to_bytes(8)
+    append_u8_vector(cp.origin.encode())
+    data += (0).to_bytes(8) # start must be 0 for checkpoints
+    data += cp.size.to_bytes(8)
+    data += cp.root_hash
+
+    return bytes(data)
+
+
 class CheckpointSigner(Protocol):
     vkey: Vkey
 
@@ -74,6 +97,22 @@ class PlainEd25519Signer:
     def sign(self, cp: Checkpoint) -> NoteSignature:
         sig = self.key.sign(cp.serialize_body().encode())
         return NoteSignature.from_vkey_signature(self.vkey, sig)
+
+
+class MLDSA44CosignatureSigner:
+    def __init__(self, name: str, key: MLDSA44PrivateKey | bytes):
+        if isinstance(key, bytes):
+            self.key = MLDSA44PrivateKey.from_seed_bytes(key)
+        else:
+            self.key = key
+
+        self.vkey = Vkey(name, None, 6, self.key.public_key().public_bytes_raw())
+
+    def sign(self, cp: Checkpoint) -> NoteSignature:
+        now = int(time.time())
+        sig_payload = _mldsa44_signature_payload(self.vkey.name, now, cp)
+        data = now.to_bytes(8) + self.key.sign(sig_payload)
+        return NoteSignature.from_vkey_signature(self.vkey, data)
 
 
 class VkeyVerifier(ABC):
@@ -146,21 +185,11 @@ class MLDSA44CosignatureVerifier(VkeyVerifier):
         return int.from_bytes(signature[0:8])
 
     def verify(self, signature: bytes, cp: Checkpoint):
-        data = bytearray()
-
-        def append_u8_vector(payload: bytes) -> None:
-            nonlocal data
-            data += len(payload).to_bytes(1)
-            data += payload
-
-        data += b'subtree/v1\n\0'
-        append_u8_vector(self.cosigner_name.encode())
-        data += self.get_timestamp(signature).to_bytes(8)
-        append_u8_vector(cp.origin.encode())
-        data += (0).to_bytes(8) # start must be 0 for checkpoints
-        data += cp.size.to_bytes(8)
-        data += cp.root_hash
-
+        data = _mldsa44_signature_payload(
+            self.cosigner_name,
+            self.get_timestamp(signature),
+            cp
+        )
         self.key.verify(signature[8:], data)
 
 

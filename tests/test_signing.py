@@ -6,7 +6,13 @@ import pytest
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from tlog_scales.signing import NoteSignature, PlainEd25519Signer, Vkey, VkeySet
+from tlog_scales.signing import (
+    MLDSA44CosignatureSigner,
+    NoteSignature,
+    PlainEd25519Signer,
+    Vkey,
+    VkeySet,
+)
 from tlog_scales.tlog import Checkpoint
 from tlog_scales.utils import sha256
 
@@ -91,7 +97,7 @@ class TestVkey:
         with pytest.raises(NotImplementedError):
             Vkey('a', None, 0, b'\xaa' * 32).get_verifier()
 
-class TestSigner:
+class TestEd25519Signer:
     def test_pyca_private_key(self):
         pyca_pk = cryptography.hazmat.primitives.serialization.load_ssh_private_key("""
 -----BEGIN OPENSSH PRIVATE KEY-----
@@ -170,6 +176,14 @@ YXAM0VmnrfvLaBCOOYSJhCaE5F10oGBOo+hkbDa1kng=
 
         with pytest.raises(InvalidSignature):
             cp2.verify(self.VKEY)
+
+class TestMLDSA44Signer:
+    def test_roundtrip(self) -> None:
+        signer = MLDSA44CosignatureSigner('example.com/mldsa44-signer', bytes(32))
+        cp = dummy_checkpoint()
+
+        signer.vkey.get_verifier().verify_note(signer.sign(cp), cp)
+
 
 class TestVkeySetVerification:
     def test_valid(self) -> None:
