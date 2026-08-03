@@ -43,12 +43,12 @@ class NoteSignature:
         return cls(name, key_id, payload[4:])
 
     @classmethod
-    def from_vkey_signature(cls, vkey: 'Vkey', signature: bytes) -> Self:
+    def from_vkey_signature(cls, vkey: Vkey, signature: bytes) -> Self:
         return cls(vkey.name, vkey.key_id, signature)
 
 
 class CheckpointSigner(Protocol):
-    vkey: 'Vkey'
+    vkey: Vkey
 
     def sign(self, cp: Checkpoint) -> NoteSignature:
         ...
@@ -77,9 +77,9 @@ class PlainEd25519Signer:
 
 
 class VkeyVerifier(ABC):
-    vkey: 'Vkey'
+    vkey: Vkey
 
-    def __init__(self, vkey: 'Vkey'):
+    def __init__(self, vkey: Vkey):
         self.vkey = vkey
 
     @abstractmethod
@@ -94,7 +94,7 @@ class VkeyVerifier(ABC):
 
 
 class PlainEd25519Verifier(VkeyVerifier):
-    def __init__(self, vkey: 'Vkey'):
+    def __init__(self, vkey: Vkey):
         assert vkey.sig_type == 1
 
         super().__init__(vkey)
@@ -109,7 +109,7 @@ class PlainEd25519Verifier(VkeyVerifier):
 
 
 class Ed25519CosignatureVerifier(VkeyVerifier):
-    def __init__(self, vkey: 'Vkey'):
+    def __init__(self, vkey: Vkey):
         assert vkey.sig_type == 4
 
         super().__init__(vkey)
@@ -131,7 +131,7 @@ class Ed25519CosignatureVerifier(VkeyVerifier):
 
 
 class MLDSA44CosignatureVerifier(VkeyVerifier):
-    def __init__(self, vkey: 'Vkey'):
+    def __init__(self, vkey: Vkey):
         assert vkey.sig_type == 6
 
         super().__init__(vkey)
