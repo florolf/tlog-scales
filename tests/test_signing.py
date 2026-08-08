@@ -128,10 +128,10 @@ U7WM79jrzyhGZ5/GUBTpM7NzwdyfFx61t3RovgcC4Ro=
 — witness.stagemole.eu Z/euoAAAAABqEiEgw0i+7g2ENfDAWHmtRzCfKTHSDwYDJA2NmKeGi9Y8FtEyOUvVr+AJmIY/2TUFucgKi7lI7cUiOvKFYe/TmN9DAg==
 """.strip())
 
-    VKEYS = [
+    VKEYS = (
         Vkey.from_string('arche2025h1.staging.ct.transparency.dev+ba2f06c0+AU0vHmlGCS/PdN8b2OaGmKprLI8HKM+dJ472xgFYh15f'),
         Vkey.from_string('remora.n621.de+da77ade7+BOvN63jn/bLvkieywe8R6UYAtVtNbZpXh34x7onlmtw2')
-    ]
+    )
 
     def test_real_checkpoint(self) -> None:
         for vkey in self.VKEYS:
