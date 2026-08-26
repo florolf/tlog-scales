@@ -8,23 +8,23 @@ def next_split(x: int) -> int:
 
 
 def tile_path(l: int, n: int, partial: int = 0) -> list[str]:
-        elements = [f'{n % 1000:03d}']
-        while n >= 1000:
-            n //= 1000
-            elements.insert(0, f'x{n % 1000:03d}')
+    elements = [f'{n % 1000:03d}']
+    while n >= 1000:
+        n //= 1000
+        elements.insert(0, f'x{n % 1000:03d}')
 
-        if partial:
-            elements[-1] += '.p'
-            elements.append(str(partial))
+    if partial:
+        elements[-1] += '.p'
+        elements.append(str(partial))
 
-        return ['tile', str(l) if l >= 0 else 'entries', *elements]
+    return ['tile', str(l) if l >= 0 else 'entries', *elements]
 
 
 def level_entries(tree_size: int, level: int) -> int:
-        if level == -1:
-            level = 0
+    if level == -1:
+        level = 0
 
-        return tree_size // 256**level
+    return tree_size // 256**level
 
 
 def level_tiles(tree_size: int, level: int) -> tuple[int, int]:
