@@ -1,5 +1,6 @@
 import dataclasses
 import typing
+from unittest import mock
 
 import cryptography.hazmat.primitives.serialization
 import pytest
@@ -7,6 +8,8 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from tlog_scales.signing import (
+    Ed25519CosignatureSigner,
+    Ed25519CosignatureVerifier,
     MLDSA44CosignatureSigner,
     NoteSignature,
     PlainEd25519Signer,
@@ -176,6 +179,51 @@ YXAM0VmnrfvLaBCOOYSJhCaE5F10oGBOo+hkbDa1kng=
 
         with pytest.raises(InvalidSignature):
             cp2.verify(self.VKEY)
+
+class TestEd25519CosignatureSigner:
+    def test_roundtrip(self) -> None:
+        signer = Ed25519CosignatureSigner('example.com/cosigner', bytes(32))
+        cp = dummy_checkpoint()
+
+        signer.vkey.get_verifier().verify_note(signer.sign(cp), cp)
+
+    def test_rejects_other_checkpoint(self) -> None:
+        signer = Ed25519CosignatureSigner('example.com/cosigner', bytes(32))
+        sig = signer.sign(dummy_checkpoint())
+
+        with pytest.raises(InvalidSignature):
+            signer.vkey.get_verifier().verify_note(sig, dummy_checkpoint(size=2))
+
+    def test_signing_time_is_recoverable_from_the_note(self) -> None:
+        signer = Ed25519CosignatureSigner('example.com/cosigner', bytes(32))
+
+        with mock.patch('tlog_scales.signing.time.time', return_value=1761000000.9):
+            sig = signer.sign(dummy_checkpoint())
+
+        assert Ed25519CosignatureVerifier.get_timestamp(sig.payload) == 1761000000
+
+    def test_accepts_a_key_object(self) -> None:
+        key = Ed25519PrivateKey.from_private_bytes(bytes(32))
+
+        assert Ed25519CosignatureSigner('example.com/cosigner', key).vkey.serialize() == \
+            Ed25519CosignatureSigner('example.com/cosigner', bytes(32)).vkey.serialize()
+
+    def test_survives_the_note_wire_format(self) -> None:
+        signer = Ed25519CosignatureSigner('example.com/cosigner', bytes(32))
+        cp = dummy_checkpoint()
+
+        parsed = NoteSignature.from_line(signer.sign(cp).serialize())
+
+        signer.vkey.get_verifier().verify_note(parsed, cp)
+
+    def test_rejects_a_note_from_a_different_cosigner(self) -> None:
+        a = Ed25519CosignatureSigner('example.com/a', bytes(32))
+        b = Ed25519CosignatureSigner('example.com/b', b'b' * 32)
+        cp = dummy_checkpoint()
+
+        with pytest.raises(RuntimeError, match="doesn't match note signature"):
+            b.vkey.get_verifier().verify_note(a.sign(cp), cp)
+
 
 class TestMLDSA44Signer:
     def test_roundtrip(self) -> None:

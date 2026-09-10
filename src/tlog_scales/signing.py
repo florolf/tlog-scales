@@ -99,6 +99,22 @@ class PlainEd25519Signer:
         return NoteSignature.from_vkey_signature(self.vkey, sig)
 
 
+class Ed25519CosignatureSigner:
+    def __init__(self, name: str, key: Ed25519PrivateKey | bytes):
+        if isinstance(key, bytes):
+            self.key = Ed25519PrivateKey.from_private_bytes(key)
+        else:
+            self.key = key
+
+        self.vkey = Vkey(name, None, 4, self.key.public_key().public_bytes_raw())
+
+    def sign(self, cp: Checkpoint) -> NoteSignature:
+        now = int(time.time())
+        sig_payload = f"cosignature/v1\ntime {now}\n{cp.serialize_body()}".encode()
+        data = now.to_bytes(8) + self.key.sign(sig_payload)
+        return NoteSignature.from_vkey_signature(self.vkey, data)
+
+
 class MLDSA44CosignatureSigner:
     def __init__(self, name: str, key: MLDSA44PrivateKey | bytes):
         if isinstance(key, bytes):
