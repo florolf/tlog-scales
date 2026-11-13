@@ -264,11 +264,14 @@ class VkeySet:
     def add(self, vkey: Vkey) -> None:
         self.keys[(vkey.name, vkey.key_id)] = vkey
 
+    def get(self, sig: NoteSignature) -> Vkey | None:
+        return self.keys.get((sig.name, sig.key_id))
+
     def verify(self, sigs: Iterable[NoteSignature], cp: Checkpoint) -> set[tuple[Vkey, NoteSignature]]:
         valid = set()
 
         for sig in sigs:
-            vkey = self.keys.get((sig.name, sig.key_id))
+            vkey = self.get(sig)
             if vkey is None:
                 continue
 
