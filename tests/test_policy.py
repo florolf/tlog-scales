@@ -291,3 +291,39 @@ class TestQuorumTimestamps:
 
         cp = dataclasses.replace(CP, signatures=[cosign(a, CP, 1000)])
         assert policy.check(cp).timestamp == 1000
+
+
+class TestSerialization:
+    def test_roundtrip(self) -> None:
+        log_a = PlainEd25519Signer('example.com/log-a', Ed25519PrivateKey.generate())
+        log_b = PlainEd25519Signer('example.com/log-b', Ed25519PrivateKey.generate())
+        a, b, c = (ed25519_witness(f'example.com/{n}') for n in 'abc')
+
+        policy = Policy.from_text(
+            f'log {log_a.vkey.serialize()}\n'
+            f'log {log_b.vkey.serialize()} https://b.example.com\n'
+            + witness_lines(a, b, c)
+            + f'group g-any any {a.vkey.name} {b.vkey.name}\n'
+            + f'group g-all all {b.vkey.name} {c.vkey.name}\n'
+            + f'group g-2 2 g-any g-all {c.vkey.name}\n'
+            + 'quorum g-2\n'
+        )
+        reparsed = Policy.from_text(policy.serialize())
+
+        assert reparsed.logs == policy.logs
+        assert reparsed.entities == policy.entities
+        assert reparsed.entry_point == policy.entry_point
+
+    def test_roundtrip_sigsum(self) -> None:
+        policy = Policy.from_text(SIGSUM_TEST_2025_3)
+        reparsed = Policy.from_text(policy.serialize())
+
+        assert reparsed.logs == policy.logs
+        assert reparsed.entities == policy.entities
+        assert reparsed.entry_point == policy.entry_point
+
+        cp = Checkpoint.from_text(BARRELEYE_CHECKPOINT)
+        assert reparsed.check(cp).timestamp == policy.check(cp).timestamp
+
+    def test_empty(self) -> None:
+        assert Policy.from_text('quorum none\n').serialize() == 'quorum none'

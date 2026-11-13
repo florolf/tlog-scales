@@ -134,6 +134,53 @@ class Policy:
 
             return cls(logs, entities, entry_point)
 
+    def serialize(self) -> str:
+        lines = []
+
+        logs = []
+        for key, url in self.logs:
+            if url is not None:
+                logs.append(f'log {key.serialize()} {url}')
+            else:
+                logs.append(f'log {key.serialize()}')
+
+        if logs:
+            lines.extend(logs)
+            lines.append("")
+
+        witnesses = []
+        for name, entity in self.entities.items():
+            if isinstance(entity, Vkey):
+                name = self.witness_names[entity.identity()]
+                witnesses.append(f'witness {name} {entity.serialize()}')
+
+        if witnesses:
+            lines.extend(witnesses)
+            lines.append("")
+
+        groups = []
+        for name, entity in self.entities.items():
+            if isinstance(entity, tuple):
+                if entity[0] == 1:
+                    cardinality = 'any'
+                elif entity[0] == len(entity[1]):
+                    cardinality = 'all'
+                else:
+                    cardinality = str(entity[0])
+
+                groups.append(f'group {name} {cardinality} {" ".join(sorted(entity[1]))}')
+
+        if groups:
+            lines.extend(groups)
+            lines.append("")
+
+        if self.entry_point is None:
+            lines.append('quorum none')
+        else:
+            lines.append(f'quorum {self.entry_point}')
+
+        return '\n'.join(lines)
+
     def check(self, cp: Checkpoint, strict: bool = False) -> Quorum:
         cosignatures: dict[int, set[tuple[str, CosignatureVerifier, NoteSignature]]] = defaultdict(set)
         for signature in cp.signatures:
