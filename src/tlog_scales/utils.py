@@ -2,14 +2,13 @@ import base64
 import hashlib
 import os
 import tempfile
+from importlib import import_module
 from pathlib import Path
 
 import requests
 
 try:
-    from .__about__ import (
-        __version__ as TLOG_SCALES_VERSION,  # ty: ignore[unresolved-import,unused-ignore-comment]
-    )
+    TLOG_SCALES_VERSION = import_module('.__about__', __package__).__version__
 except ImportError:
     TLOG_SCALES_VERSION = "unknown"
 

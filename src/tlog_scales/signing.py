@@ -209,6 +209,9 @@ class MLDSA44CosignatureVerifier(VkeyVerifier):
         self.key.verify(signature[8:], data)
 
 
+CosignatureVerifier = Ed25519CosignatureVerifier | MLDSA44CosignatureVerifier
+
+
 class Vkey:
     def __init__(self, name: str, key_id: int | None, sig_type: int, pubkey: bytes):
         self.name = name
@@ -226,6 +229,24 @@ class Vkey:
 
     def __str__(self) -> str:
         return f'Vkey(name={self.name}, key_id={self.key_id:08x}, sig_type={self.sig_type}, pubkey={self.pubkey.hex()})'
+
+    def identity(self) -> tuple[str, int]:
+        return (self.name, self.key_id)
+
+    def key_params(self) -> tuple[int, bytes]:
+        return (self.sig_type, self.pubkey)
+
+    def equivalent(self, other: Vkey) -> bool:
+        return self.key_params() == other.key_params()
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Vkey):
+            return False
+
+        return self.identity() == other.identity() and self.equivalent(other)
+
+    def __hash__(self) -> int:
+        return hash((self.identity(), self.key_params()))
 
     def serialize(self):
         return f'{self.name}+{self.key_id:08x}+{b64enc(self.sig_type.to_bytes() + self.pubkey)}'
