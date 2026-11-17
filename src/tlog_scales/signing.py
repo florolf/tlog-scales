@@ -85,6 +85,15 @@ class DummySigner:
         return NoteSignature.from_vkey_signature(self.vkey, sha256(cp.serialize_body().encode()))
 
 
+class FixedPayloadSigner:
+    def __init__(self, vkey: Vkey, payload: bytes):
+        self.vkey = vkey
+        self.payload = payload
+
+    def sign(self, cp: Checkpoint) -> NoteSignature:
+        return NoteSignature.from_vkey_signature(self.vkey, self.payload)
+
+
 class PlainEd25519Signer:
     def __init__(self, name: str, key: Ed25519PrivateKey | bytes):
         if isinstance(key, bytes):
