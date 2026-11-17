@@ -1,4 +1,5 @@
 import dataclasses
+from textwrap import dedent
 from unittest import mock
 
 import pytest
@@ -219,6 +220,147 @@ def test_strict_rejects_invalid_cosignature() -> None:
 
     with pytest.raises(InvalidSignature):
         policy.check(cp, strict=True)
+
+
+class TestQuorum:
+    CHECKPOINT = '''\
+sigsum.org/v1/tree/44ad38f8226ff9bd27629a41e55df727308d0a1cd8a2c31d3170048ac1dd22a1
+32692
+QVHjDWWN5XX6NOJjZvNSL0fbqH3QbM6iCLzVxcgafEQ=
+
+— seasalp.glasklar.is qJgFLmrQsQcy/on7IPwGdedr2DE/E2v3E50ByMWkra4sH81EeOwKtszeI96W5vTsu9CMjUdY+hcPAAtu4Yyy6t4tOQQ=
+— tillitis.se/tillitis-witness-1 kkZpSgAAAABptVHWkFctmBsh12Sx9Ybs+xMjg65GncWnREog1K5k11vNxMIRfVlg5wth0Pc4A8SX+BOgeziuitPL2cYOxMK47y6xDQ==
+— witness.glasklar.is kK2A5gAAAABptVHWiIdVH4utwZr8B1qC2lYkY9yDVZmt+4R4ARKh1i/spFOuDlFyJtNwEe/LCfi4SX3+KTbN3mceQwKY/9nwJnTjAA==
+— witness.mullvad.net DjXQTQAAAABptVHW/S0bV0v7U+aDuEsUdy1OD5j8MfNBAgWKuiRkOWhr6HZcDgNVsuxT1Uk0lKKCQs1IpVNwV9W7n7jOt1hUY7COAQ==
+'''
+
+    def test_none_quorum(self):
+        quorum = Policy.from_text("quorum none")
+        quorum.check(Checkpoint.from_text(self.CHECKPOINT))
+
+    def test_witness_quorum(self):
+        quorum = Policy.from_text(dedent("""
+        witness witness.glasklar.is witness.glasklar.is+90ad80e6+BLIQbbkGXsl/JeCcGIOSFnUabibY7YtB5IWlY9PRSYU2
+        quorum witness.glasklar.is
+        """))
+        quorum.check(Checkpoint.from_text(self.CHECKPOINT))
+
+    def test_group_quorum(self):
+        for size in range(1, 4):
+            quorum = Policy.from_text(dedent(f"""
+            witness witness.glasklar.is witness.glasklar.is+90ad80e6+BLIQbbkGXsl/JeCcGIOSFnUabibY7YtB5IWlY9PRSYU2
+            witness witness.mullvad.net witness.mullvad.net+0e35d04d+BBXW0BQVQyR7dLqzwQdjctnIlPYZw3bWSymqMSzAD2Gt
+            witness dummy               dummy+fb7c490e+BMkZwJ5FMrVl8ns7nrbXlL0+pyFiFXYTrAVJMpSlhHZW
+            group group {size} witness.glasklar.is witness.mullvad.net dummy
+            quorum group
+            """))
+
+            if size < 3:
+                quorum.check(Checkpoint.from_text(self.CHECKPOINT))
+            else:
+                with pytest.raises(QuorumUnsatisfiedError):
+                    quorum.check(Checkpoint.from_text(self.CHECKPOINT))
+
+    def test_invalid_quorum_rule(self):
+        policies = [
+            # witness name collision
+            ('already exists', """
+            witness dummy              0000000000000000000000000000000000000000000000000000000000000000
+            witness dummy              0000000000000000000000000000000000000000000000000000000000000000
+            quorum dummy
+            """),
+
+            # group name collision
+            ('already exists', """
+            witness dummy1             0000000000000000000000000000000000000000000000000000000000000000
+            witness dummy2             1111111111111111111111111111111111111111111111111111111111111111
+
+            group foo any dummy1
+            group foo any dummy2
+            quorum dummy1
+            """),
+
+            # witness/group name collision
+            ('already exists', """
+            witness dummy1             0000000000000000000000000000000000000000000000000000000000000000
+            group dummy1 any dummy1
+            quorum dummy1
+            """),
+
+            # unknown group member
+            ('unknown entity', """
+            witness dummy1             0000000000000000000000000000000000000000000000000000000000000000
+            group group any dummy2
+            quorum dummy1
+            """),
+
+            # empty group
+            ('no member', """
+            group group any
+            quorum group
+            """),
+
+            # zero threshold
+            ('invalid threshold', """
+            witness dummy1             0000000000000000000000000000000000000000000000000000000000000000
+            group group 0 dummy1
+            quorum dummy1
+            """),
+
+            # excessive threshold
+            ('invalid threshold', """
+            witness dummy1             0000000000000000000000000000000000000000000000000000000000000000
+            group group 2 dummy1
+            quorum dummy1
+            """),
+
+            # multiple quorum lines
+            ('multiple quorum', """
+            witness dummy1             0000000000000000000000000000000000000000000000000000000000000000
+            quorum dummy1
+
+            witness dummy2             1111111111111111111111111111111111111111111111111111111111111111
+            quorum dummy2
+            """),
+
+            # entity called "none"
+            ('"none" is reserved', """
+            witness none               0000000000000000000000000000000000000000000000000000000000000000
+            quorum none
+            """),
+
+            # quorum missing
+            ('quorum not specified', """
+            witness dummy              0000000000000000000000000000000000000000000000000000000000000000
+            """),
+        ]
+
+        for match, pol in policies:
+            with pytest.raises(ValueError, match=match):
+                Policy.from_text(dedent(pol))
+
+    def test_invalid_cosignature(self):
+        th = Checkpoint.from_text(dedent("""\
+        sigsum.org/v1/tree/44ad38f8226ff9bd27629a41e55df727308d0a1cd8a2c31d3170048ac1dd22a1
+        32692
+        QVHjDWWN5XX6NOJjZvNSL0fbqH3QbM6iCLzVxcgafEQ=
+
+        — seasalp.glasklar.is qJgFLmrQsQcy/on7IPwGdedr2DE/E2v3E50ByMWkra4sH81EeOwKtszeI96W5vTsu9CMjUdY+hcPAAtu4Yyy6t4tOQQ=
+        — witness.glasklar.is kK2A5gAAAABJlgLSiIdVH4utwZr8B1qC2lYkY9yDVZmt+4R4ARKh1i/spFOuDlFyJtNwEe/LCfi4SX3+KTbN3mceQwKY/9nwJnTjAA==
+        """))
+
+        policy = Policy.from_text(dedent("""
+        witness witness.glasklar.is witness.glasklar.is+90ad80e6+BLIQbbkGXsl/JeCcGIOSFnUabibY7YtB5IWlY9PRSYU2
+        quorum witness.glasklar.is
+        """))
+
+        # we deliberately don't raise a crypto error here by default but rather
+        # just ignore the witness, which should cause the quorum to fail
+        with pytest.raises(QuorumUnsatisfiedError):
+            policy.check(th)
+
+        with pytest.raises(InvalidSignature):
+            policy.check(th, strict=True)
 
 
 class TestQuorumTimestamps:
