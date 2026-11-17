@@ -27,7 +27,7 @@ class Policy:
                 self.witness_names[entity.identity()] = name
 
     @staticmethod
-    def _parse_key(key: str, witness: bool, sigsum: bool | None = None) -> tuple[Vkey, bool]:
+    def _parse_key(key: str, witness: bool, sigsum: bool | None = None, name: str | None = None) -> tuple[Vkey, bool]:
         if sigsum is False:
             return (Vkey.from_string(key), False)
 
@@ -38,10 +38,10 @@ class Policy:
 
             keyhash = sha256(pubkey).hex()
             if witness:
-                name = f'sigsum.org/v1/witness/{keyhash}'
+                name = name or f'sigsum.org/v1/witness/{keyhash}'
                 key_type = 4
             else:
-                name = f'sigsum.org/v1/tree/{keyhash}'
+                name = name or f'sigsum.org/v1/tree/{keyhash}'
                 key_type = 1
 
             return (Vkey(name, None, key_type, pubkey), True)
@@ -74,7 +74,7 @@ class Policy:
                     if name in entities:
                         raise ValueError(f'quorum entity "{name}" already exists')
 
-                    vkey, is_sigsum = cls._parse_key(pubkey, True, is_sigsum)
+                    vkey, is_sigsum = cls._parse_key(pubkey, True, is_sigsum, name=name)
                     try:
                         verifier = vkey.get_verifier()
                     except NotImplementedError:
