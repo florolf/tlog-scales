@@ -1,6 +1,8 @@
 import typing
 from pathlib import Path
 
+import requests
+
 from . import utils
 
 
@@ -22,9 +24,9 @@ class LocalBackend:
 
 
 class HttpBackend:
-    def __init__(self, base: str):
+    def __init__(self, base: str, session: requests.Session | None = None):
         self.base = base.rstrip('/')
-        self.session = utils.make_session()
+        self.session = session or utils.make_session()
 
     def get(self, *path: str) -> bytes | None:
         url = self.base + '/' + '/'.join(path)
