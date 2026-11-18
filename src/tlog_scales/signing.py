@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, Self
 
+import cryptography.exceptions
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
     Ed25519PublicKey,
@@ -22,6 +23,11 @@ if TYPE_CHECKING:
     from .tlog import Checkpoint
 
 logger = logging.getLogger(__name__)
+
+
+class SignatureInvalid(Exception):
+    pass
+
 
 @dataclass(frozen=True)
 class NoteSignature:
@@ -169,7 +175,10 @@ class PlainEd25519Verifier(VkeyVerifier):
 
     def verify(self, signature: bytes, cp: Checkpoint) -> None:
         data = cp.serialize_body().encode()
-        self.key.verify(signature, data)
+        try:
+            self.key.verify(signature, data)
+        except cryptography.exceptions.InvalidSignature as e:
+            raise SignatureInvalid from e
 
 
 class Ed25519CosignatureVerifier(VkeyVerifier):
@@ -191,7 +200,10 @@ class Ed25519CosignatureVerifier(VkeyVerifier):
         message = f'cosignature/v1\ntime {timestamp}\n'.encode()
         message += cp.serialize_body().encode()
 
-        self.key.verify(signature[8:], message)
+        try:
+            self.key.verify(signature[8:], message)
+        except cryptography.exceptions.InvalidSignature as e:
+            raise SignatureInvalid from e
 
 
 class MLDSA44CosignatureVerifier(VkeyVerifier):
@@ -215,7 +227,11 @@ class MLDSA44CosignatureVerifier(VkeyVerifier):
             self.get_timestamp(signature),
             cp
         )
-        self.key.verify(signature[8:], data)
+
+        try:
+            self.key.verify(signature[8:], data)
+        except cryptography.exceptions.InvalidSignature as e:
+            raise SignatureInvalid from e
 
 
 CosignatureVerifier = Ed25519CosignatureVerifier | MLDSA44CosignatureVerifier

@@ -4,7 +4,6 @@ from unittest import mock
 
 import cryptography.hazmat.primitives.serialization
 import pytest
-from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from tlog_scales.signing import (
@@ -13,6 +12,7 @@ from tlog_scales.signing import (
     MLDSA44CosignatureSigner,
     NoteSignature,
     PlainEd25519Signer,
+    SignatureInvalid,
     Vkey,
     VkeySet,
 )
@@ -144,7 +144,7 @@ U7WM79jrzyhGZ5/GUBTpM7NzwdyfFx61t3RovgcC4Ro=
         cp2 = dataclasses.replace(self.CHECKPOINT, size=42)
 
         for vkey in self.VKEYS:
-            with pytest.raises(InvalidSignature):
+            with pytest.raises(SignatureInvalid):
                 cp2.verify(vkey)
 
     def test_missing_key_fails(self) -> None:
@@ -177,7 +177,7 @@ YXAM0VmnrfvLaBCOOYSJhCaE5F10oGBOo+hkbDa1kng=
     def test_verify_clobbered(self) -> None:
         cp2 = dataclasses.replace(self.CHECKPOINT, size=42)
 
-        with pytest.raises(InvalidSignature):
+        with pytest.raises(SignatureInvalid):
             cp2.verify(self.VKEY)
 
 class TestEd25519CosignatureSigner:
@@ -191,7 +191,7 @@ class TestEd25519CosignatureSigner:
         signer = Ed25519CosignatureSigner('example.com/cosigner', bytes(32))
         sig = signer.sign(dummy_checkpoint())
 
-        with pytest.raises(InvalidSignature):
+        with pytest.raises(SignatureInvalid):
             signer.vkey.get_verifier().verify_note(sig, dummy_checkpoint(size=2))
 
     def test_signing_time_is_recoverable_from_the_note(self) -> None:

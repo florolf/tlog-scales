@@ -3,7 +3,6 @@ from textwrap import dedent
 from unittest import mock
 
 import pytest
-from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.asymmetric.mldsa import MLDSA44PrivateKey
 
@@ -13,6 +12,7 @@ from tlog_scales.signing import (
     MLDSA44CosignatureSigner,
     NoteSignature,
     PlainEd25519Signer,
+    SignatureInvalid,
     Vkey,
 )
 from tlog_scales.tlog import Checkpoint
@@ -218,7 +218,7 @@ def test_strict_rejects_invalid_cosignature() -> None:
     other = dataclasses.replace(CP, size=CP.size + 1)
     cp = dataclasses.replace(CP, signatures=[cosign(witness, other, 1000)])
 
-    with pytest.raises(InvalidSignature):
+    with pytest.raises(SignatureInvalid):
         policy.check(cp, strict=True)
 
 
@@ -359,7 +359,7 @@ QVHjDWWN5XX6NOJjZvNSL0fbqH3QbM6iCLzVxcgafEQ=
         with pytest.raises(QuorumUnsatisfiedError):
             policy.check(th)
 
-        with pytest.raises(InvalidSignature):
+        with pytest.raises(SignatureInvalid):
             policy.check(th, strict=True)
 
 
